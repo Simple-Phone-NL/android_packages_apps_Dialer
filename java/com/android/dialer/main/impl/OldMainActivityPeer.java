@@ -94,7 +94,6 @@ import com.android.dialer.voicemailstatus.VoicemailStatusHelper;
 import com.android.voicemail.VoicemailComponent;
 
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import java.util.Locale;
@@ -213,26 +212,23 @@ public class OldMainActivityPeer implements MainActivityPeer, FragmentUtilListen
     BottomSheetBehavior<View> bottomSheetBehavior = BottomSheetBehavior.from(bottomSheet);
     bottomSheetBehavior.setState(BottomSheetBehavior.STATE_HIDDEN);
 
-    FloatingActionButton fab = activity.findViewById(R.id.fab);
-    fab.setOnClickListener(
-        v -> {
-          searchController.showDialpad(true);
-          if (callLogAdapterOnActionModeStateChangedListener.isEnabled) {
-            LogUtil.i("OldMainActivityPeer.onFabClicked", "closing multiselect");
-            callLogAdapterOnActionModeStateChangedListener.actionMode.finish();
-          }
-        });
-
     MainToolbar toolbar = activity.findViewById(R.id.toolbar);
     toolbar.maybeShowSimulator(activity);
     activity.setSupportActionBar(activity.findViewById(R.id.toolbar));
 
     bottomNav = activity.findViewById(R.id.bottom_nav_bar);
+    bottomNav.setOnDialpadClickListener(
+        v -> {
+          searchController.showDialpad(true);
+          if (callLogAdapterOnActionModeStateChangedListener.isEnabled) {
+            LogUtil.i("OldMainActivityPeer.onDialpadClicked", "closing multiselect");
+            callLogAdapterOnActionModeStateChangedListener.actionMode.finish();
+          }
+        });
     bottomNavTabListener =
         new MainBottomNavBarBottomNavTabListener(
             activity,
             activity.getSupportFragmentManager(),
-            fab,
             bottomSheet);
     bottomNav.addOnTabSelectedListener(bottomNavTabListener);
     // TODO(uabdullah): Handle case of when a sim is inserted/removed while the activity is open.
@@ -248,7 +244,7 @@ public class OldMainActivityPeer implements MainActivityPeer, FragmentUtilListen
             activity, activity.getContentResolver(), bottomNav, toolbar, bottomNavTabListener);
     bottomNav.addOnTabSelectedListener(callLogFragmentListener);
 
-    searchController = getNewMainSearchController(bottomNav, fab, toolbar, snackbarContainer);
+    searchController = getNewMainSearchController(bottomNav, toolbar, snackbarContainer);
     toolbar.setSearchBarListener(searchController);
 
     onDialpadQueryChangedListener = getNewOnDialpadQueryChangedListener(searchController);
@@ -257,7 +253,7 @@ public class OldMainActivityPeer implements MainActivityPeer, FragmentUtilListen
     searchFragmentListener = new MainSearchFragmentListener(searchController);
     callLogAdapterOnActionModeStateChangedListener =
         new MainCallLogAdapterOnActionModeStateChangedListener();
-    callLogHostInterface = new MainCallLogHost(searchController, fab);
+    callLogHostInterface = new MainCallLogHost(searchController);
 
     speedDialFragmentHost =
         new MainSpeedDialFragmentHost(
@@ -507,11 +503,10 @@ public class OldMainActivityPeer implements MainActivityPeer, FragmentUtilListen
 
   public MainSearchController getNewMainSearchController(
       BottomNavBar bottomNavBar,
-      FloatingActionButton fab,
       MainToolbar mainToolbar,
       View fragmentContainer) {
     return new MainSearchController(
-        activity, bottomNavBar, fab, mainToolbar, fragmentContainer);
+        activity, bottomNavBar, mainToolbar, fragmentContainer);
   }
 
   public MainOnDialpadQueryChangedListener getNewOnDialpadQueryChangedListener(
@@ -652,12 +647,10 @@ public class OldMainActivityPeer implements MainActivityPeer, FragmentUtilListen
   /** @see CallLogFragment.HostInterface */
   private static final class MainCallLogHost implements CallLogFragment.HostInterface {
 
-    private final FloatingActionButton fab;
     private final MainSearchController searchController;
 
-    MainCallLogHost(MainSearchController searchController, FloatingActionButton fab) {
+    MainCallLogHost(MainSearchController searchController) {
       this.searchController = searchController;
-      this.fab = fab;
     }
 
     @Override
@@ -667,12 +660,9 @@ public class OldMainActivityPeer implements MainActivityPeer, FragmentUtilListen
 
     @Override
     public void enableFloatingButton(boolean enabled) {
+      // No-op. The dialpad button lives in the bottom nav bar, which is hidden automatically
+      // whenever the call log enters multi-select mode.
       LogUtil.i("MainCallLogHost.enableFloatingButton", "enabled: " + enabled);
-      if (enabled) {
-        fab.show();
-      } else {
-        fab.hide();
-      }
     }
   }
 
@@ -946,7 +936,6 @@ public class OldMainActivityPeer implements MainActivityPeer, FragmentUtilListen
 
     private final TransactionSafeActivity activity;
     private final FragmentManager fragmentManager;
-    private final FloatingActionButton fab;
     private final View bottomSheet;
 
     @TabIndex private int selectedTab = TabIndex.NONE;
@@ -954,11 +943,9 @@ public class OldMainActivityPeer implements MainActivityPeer, FragmentUtilListen
     private MainBottomNavBarBottomNavTabListener(
         TransactionSafeActivity activity,
         FragmentManager fragmentManager,
-        FloatingActionButton fab,
         View bottomSheet) {
       this.activity = activity;
       this.fragmentManager = fragmentManager;
-      this.fab = fab;
       this.bottomSheet = bottomSheet;
     }
 
@@ -972,8 +959,6 @@ public class OldMainActivityPeer implements MainActivityPeer, FragmentUtilListen
 
       Fragment fragment = fragmentManager.findFragmentByTag(SPEED_DIAL_TAG);
       showFragment(fragment == null ? SpeedDialFragment.newInstance() : fragment, SPEED_DIAL_TAG);
-
-      fab.show();
     }
 
     @Override
@@ -987,7 +972,6 @@ public class OldMainActivityPeer implements MainActivityPeer, FragmentUtilListen
       Fragment fragment = fragmentManager.findFragmentByTag(CALL_LOG_TAG);
       showFragment(fragment == null ? new CallLogFragment() : fragment, CALL_LOG_TAG);
 
-      fab.show();
       showPromotionBottomSheet(activity, bottomSheet);
     }
 
@@ -1032,7 +1016,6 @@ public class OldMainActivityPeer implements MainActivityPeer, FragmentUtilListen
       showFragment(
           fragment == null ? ContactsFragment.newInstance(Header.ADD_CONTACT) : fragment,
           CONTACTS_TAG);
-      fab.show();
     }
 
     @Override

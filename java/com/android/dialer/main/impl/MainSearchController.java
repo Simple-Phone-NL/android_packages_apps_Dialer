@@ -17,22 +17,16 @@
 
 package com.android.dialer.main.impl;
 
-import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.os.Bundle;
-import android.speech.RecognizerIntent;
 import android.text.TextUtils;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.Animation.AnimationListener;
-import android.widget.Toast;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.AttrRes;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentTransaction;
 
@@ -55,8 +49,6 @@ import com.android.dialer.smartdial.util.SmartDialNameMatcher;
 import com.android.dialer.util.DialerUtils;
 import com.android.dialer.util.TransactionSafeActivity;
 
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -68,16 +60,14 @@ import java.util.Optional;
  *
  * <ul>
  *   <li>Bottom Nav Bar, completely hidden when in search ui.
- *   <li>FAB, visible in dialpad search when dialpad is hidden. Otherwise, FAB is hidden.
  *   <li>Toolbar, expanded and visible when dialpad is hidden. Otherwise, hidden off screen.
- *   <li>Dialpad, shown through fab clicks and hidden with Android back button.
+ *   <li>Dialpad, shown through the bottom nav dialpad button and hidden with Android back button.
  * </ul>
  *
  * @see #onBackPressed()
  */
 public class MainSearchController implements SearchBarListener {
 
-  private static final String KEY_IS_FAB_HIDDEN = "is_fab_hidden";
   private static final String KEY_IS_TOOLBAR_EXPANDED = "is_toolbar_expanded";
   private static final String KEY_IS_TOOLBAR_SLIDE_UP = "is_toolbar_slide_up";
 
@@ -86,7 +76,6 @@ public class MainSearchController implements SearchBarListener {
 
   private final TransactionSafeActivity activity;
   private final BottomNavBar bottomNav;
-  private final FloatingActionButton fab;
   private final MainToolbar toolbar;
 
   /** View located underneath the toolbar that needs to animate with it. */
@@ -106,17 +95,13 @@ public class MainSearchController implements SearchBarListener {
   private DialpadFragment dialpadFragment;
   private NewSearchFragment searchFragment;
 
-  private final ActivityResultLauncher<Intent> mVoiceSearchLauncher;
-
   public MainSearchController(
       TransactionSafeActivity activity,
       BottomNavBar bottomNav,
-      FloatingActionButton fab,
       MainToolbar toolbar,
       View fragmentContainer) {
     this.activity = activity;
     this.bottomNav = bottomNav;
-    this.fab = fab;
     this.toolbar = toolbar;
     this.fragmentContainer = fragmentContainer;
 
@@ -124,11 +109,6 @@ public class MainSearchController implements SearchBarListener {
             .findFragmentByTag(DIALPAD_FRAGMENT_TAG);
     searchFragment = (NewSearchFragment) activity.getSupportFragmentManager()
             .findFragmentByTag(SEARCH_FRAGMENT_TAG);
-
-    mVoiceSearchLauncher = activity.registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(), result -> {
-              onVoiceResults(result.getResultCode(), result.getData());
-            });
   }
 
   /** Should be called if we're showing the dialpad because of a new ACTION_DIAL intent. */
@@ -158,7 +138,6 @@ public class MainSearchController implements SearchBarListener {
       return;
     }
 
-    fab.hide();
     toolbar.slideUp(animate, fragmentContainer);
     toolbar.expand(animate, Optional.empty(), /* requestFocus */ false);
 
@@ -221,7 +200,6 @@ public class MainSearchController implements SearchBarListener {
       return;
     }
 
-    fab.show();
     toolbar.slideDown(animate, fragmentContainer);
     toolbar.transferQueryFromDialpad(dialpadFragment.getQuery());
     activity.setTitle(R.string.main_activity_label);
@@ -330,8 +308,6 @@ public class MainSearchController implements SearchBarListener {
 
     if (isDialpadVisible()) {
       hideDialpad(animate);
-    } else if (!fab.isShown()) {
-      fab.show();
     }
     showBottomNav();
     updateStatusBarColor(android.R.attr.statusBarColor);
@@ -385,7 +361,7 @@ public class MainSearchController implements SearchBarListener {
   /**
    * Opens search in regular/search bar search mode.
    *
-   * <p>Hides fab, expands toolbar and starts the search fragment.
+   * <p>Expands toolbar and starts the search fragment.
    */
   @Override
   public void onSearchBarClicked() {
@@ -396,7 +372,6 @@ public class MainSearchController implements SearchBarListener {
   private void openSearch(Optional<String> query) {
     LogUtil.enterBlock("MainSearchController.openSearch");
 
-    fab.hide();
     toolbar.expand(/* animate=*/ true, query, /* requestFocus */ true);
     toolbar.showKeyboard();
     hideBottomNav();
@@ -442,16 +417,6 @@ public class MainSearchController implements SearchBarListener {
       searchFragment.setQuery(normalizedQuery, CallInitiationType.Type.DIALPAD);
     }
     dialpadFragment.process_quote_emergency_unquote(normalizedQuery);
-  }
-
-  @Override
-  public void onVoiceButtonClicked(VoiceSearchResultCallback voiceSearchResultCallback) {
-    try {
-      Intent voiceIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-      mVoiceSearchLauncher.launch(voiceIntent);
-    } catch (ActivityNotFoundException e) {
-      Toast.makeText(activity, R.string.voice_search_not_available, Toast.LENGTH_SHORT).show();
-    }
   }
 
   @Override
@@ -509,30 +474,12 @@ public class MainSearchController implements SearchBarListener {
     requestingPermission = true;
   }
 
-  public void onVoiceResults(int resultCode, Intent data) {
-    if (resultCode == AppCompatActivity.RESULT_OK) {
-      ArrayList<String> matches = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
-      if (matches.size() > 0) {
-        LogUtil.i("MainSearchController.onVoiceResults", "voice search - match found");
-        openSearch(Optional.of(matches.get(0)));
-      } else {
-        LogUtil.i("MainSearchController.onVoiceResults", "voice search - nothing heard");
-      }
-    } else {
-      LogUtil.e("MainSearchController.onVoiceResults", "voice search failed");
-    }
-  }
-
   public void onSaveInstanceState(Bundle bundle) {
-    bundle.putBoolean(KEY_IS_FAB_HIDDEN, !fab.isShown());
     bundle.putBoolean(KEY_IS_TOOLBAR_EXPANDED, toolbar.isExpanded());
     bundle.putBoolean(KEY_IS_TOOLBAR_SLIDE_UP, toolbar.isSlideUp());
   }
 
   public void onRestoreInstanceState(Bundle savedInstanceState) {
-    if (savedInstanceState.getBoolean(KEY_IS_FAB_HIDDEN, false)) {
-      fab.hide();
-    }
     boolean isSlideUp = savedInstanceState.getBoolean(KEY_IS_TOOLBAR_SLIDE_UP, false);
     if (isSlideUp) {
       toolbar.slideUp(false, fragmentContainer);

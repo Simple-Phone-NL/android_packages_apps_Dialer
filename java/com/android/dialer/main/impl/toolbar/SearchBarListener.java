@@ -34,9 +34,6 @@ public interface SearchBarListener {
   /** Called when the back button is clicked in the search bar. */
   void onSearchBackButtonClicked();
 
-  /** Called when the voice search button is clicked. */
-  void onVoiceButtonClicked(VoiceSearchResultCallback voiceSearchResultCallback);
-
   /** Called when a toolbar menu item is clicked. */
   boolean onMenuItemClicked(MenuItem menuItem);
 
@@ -51,11 +48,4 @@ public interface SearchBarListener {
 
   /** Called when a permission is about to be requested. */
   void requestingPermission();
-
-  /** Interface for returning voice results to the search bar. */
-  interface VoiceSearchResultCallback {
-
-    /** Sets the voice results in the search bar and expands the search UI. */
-    void setResult(String result);
-  }
 }

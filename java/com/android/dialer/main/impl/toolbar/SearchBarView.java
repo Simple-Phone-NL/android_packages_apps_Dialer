@@ -82,7 +82,6 @@ final class SearchBarView extends FrameLayout {
     searchBoxExpanded = findViewById(R.id.search_box_expanded);
 
     setOnClickListener(v -> listener.onSearchBarClicked());
-    findViewById(R.id.voice_search_button).setOnClickListener(v -> voiceSearchClicked());
     findViewById(R.id.search_back_button).setOnClickListener(v -> onSearchBackButtonClicked());
     clearButton.setOnClickListener(v -> onSearchClearButtonClicked());
     searchBox.addTextChangedListener(new SearchBoxTextWatcher());
@@ -99,15 +98,6 @@ final class SearchBarView extends FrameLayout {
 
     listener.onSearchBackButtonClicked();
     collapse(true);
-  }
-
-  private void voiceSearchClicked() {
-    listener.onVoiceButtonClicked(
-        result -> {
-          if (!TextUtils.isEmpty(result)) {
-            expand(/* animate */ true, Optional.of(result), /* requestFocus */ true);
-          }
-        });
   }
 
   /**
