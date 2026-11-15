@@ -23,8 +23,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
-import com.android.incallui.util.AccessibilityUtil;
-
 /** Creates the appropriate {@link AnswerMethod} for the circumstances. */
 public class AnswerMethodFactory {
 
@@ -48,6 +46,7 @@ public class AnswerMethodFactory {
   }
 
   private static boolean needTwoButton(@NonNull Activity activity) {
-    return AccessibilityUtil.isTouchExplorationEnabled(activity) || activity.isInMultiWindowMode();
+    // Always use the simple answer/decline buttons instead of the swipe gesture.
+    return true;
   }
 }

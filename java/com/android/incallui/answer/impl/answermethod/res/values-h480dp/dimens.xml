@@ -17,4 +17,5 @@
 
 <resources>
   <dimen name="two_button_bottom_padding">60dp</dimen>
+  <dimen name="two_button_button_size">80dp</dimen>
 </resources>
