@@ -25,8 +25,6 @@ public interface AnswerScreenDelegate {
 
   void onAnswerScreenUnready();
 
-  void onRejectCallWithMessage(String message);
-
   void onAnswer(boolean answerVideoAsAudio);
 
   void onReject();

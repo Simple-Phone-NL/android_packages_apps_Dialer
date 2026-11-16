@@ -23,8 +23,6 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
-import android.app.KeyguardManager;
-import android.app.KeyguardManager.KeyguardDismissCallback;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.location.Location;
@@ -58,10 +56,7 @@ import com.android.dialer.common.FragmentUtils;
 import com.android.dialer.common.LogUtil;
 import com.android.dialer.common.MathUtil;
 import com.android.dialer.multimedia.MultimediaData;
-import com.android.dialer.telecom.TelecomUtil;
 import com.android.dialer.util.ViewUtil;
-import com.android.incallui.answer.impl.CreateCustomSmsDialogFragment.CreateCustomSmsHolder;
-import com.android.incallui.answer.impl.SmsBottomSheetFragment.SmsSheetHolder;
 import com.android.incallui.answer.impl.affordance.SwipeButtonHelper.Callback;
 import com.android.incallui.answer.impl.affordance.SwipeButtonView;
 import com.android.incallui.answer.impl.answermethod.AnswerMethod;
@@ -80,15 +75,12 @@ import com.android.incallui.incall.protocol.InCallScreenDelegateFactory;
 import com.android.incallui.incall.protocol.PrimaryCallState;
 import com.android.incallui.incall.protocol.PrimaryInfo;
 import com.android.incallui.incall.protocol.SecondaryInfo;
-import com.android.incallui.incalluilock.InCallUiLock;
 import com.android.incallui.sessiondata.AvatarPresenter;
 import com.android.incallui.sessiondata.MultimediaFragment;
 import com.android.incallui.util.AccessibilityUtil;
 import com.android.incallui.video.protocol.VideoCallScreen;
 import com.android.incallui.videotech.utils.VideoUtils;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 
 /** The new version of the incoming call screen. */
@@ -96,8 +88,6 @@ import java.util.Objects;
 public class AnswerFragment extends Fragment
     implements AnswerScreen,
         InCallScreen,
-        SmsSheetHolder,
-        CreateCustomSmsHolder,
         AnswerMethodHolder,
         MultimediaFragment.Holder {
 
@@ -149,27 +139,13 @@ public class AnswerFragment extends Fragment
   private boolean hasAnimatedEntry;
   private PrimaryInfo primaryInfo = PrimaryInfo.empty();
   private PrimaryCallState primaryCallState;
-  private ArrayList<CharSequence> textResponses;
-  private SmsBottomSheetFragment textResponsesFragment;
-  private CreateCustomSmsDialogFragment createCustomSmsDialogFragment;
-  private SecondaryBehavior secondaryBehavior = SecondaryBehavior.REJECT_WITH_SMS;
+  private SecondaryBehavior secondaryBehavior = SecondaryBehavior.ANSWER_VIDEO_AS_AUDIO;
   private SecondaryBehavior answerAndReleaseBehavior;
   private ContactGridManager contactGridManager;
   private VideoCallScreen answerVideoCallScreen;
   private final Handler handler = new Handler(Looper.getMainLooper());
 
   private enum SecondaryBehavior {
-    REJECT_WITH_SMS(
-        R.drawable.quantum_ic_message_vd_theme_24,
-        R.string.a11y_description_incoming_call_reject_with_sms,
-        R.string.a11y_incoming_call_reject_with_sms,
-        R.string.call_incoming_swipe_to_decline_with_message) {
-      @Override
-      public void performAction(AnswerFragment fragment) {
-        fragment.showMessageMenu();
-      }
-    },
-
     ANSWER_VIDEO_AS_AUDIO(
         R.drawable.quantum_ic_videocam_off_vd_theme_24,
         R.string.a11y_description_incoming_call_answer_video_as_audio,
@@ -378,30 +354,9 @@ public class AnswerFragment extends Fragment
     return getArguments().getBoolean(ARG_IS_VIDEO_UPGRADE_REQUEST);
   }
 
-  @Override
-  public void setTextResponses(List<String> textResponses) {
-    if (isVideoCall() || isVideoUpgradeRequest()) {
-      LogUtil.i("AnswerFragment.setTextResponses", "no-op for video calls");
-    } else if (textResponses == null) {
-      LogUtil.i("AnswerFragment.setTextResponses", "no text responses, hiding secondary button");
-      this.textResponses = null;
-      secondaryButton.setVisibility(View.INVISIBLE);
-    } else if (getActivity().isInMultiWindowMode()) {
-      LogUtil.i("AnswerFragment.setTextResponses", "in multiwindow, hiding secondary button");
-      this.textResponses = null;
-      secondaryButton.setVisibility(View.INVISIBLE);
-    } else {
-      LogUtil.i("AnswerFragment.setTextResponses", "textResponses.size: " + textResponses.size());
-      this.textResponses = new ArrayList<>(textResponses);
-      secondaryButton.setVisibility(View.VISIBLE);
-    }
-  }
-
   private void initSecondaryButton() {
-    secondaryBehavior =
-        isVideoCall() || isVideoUpgradeRequest()
-            ? SecondaryBehavior.ANSWER_VIDEO_AS_AUDIO
-            : SecondaryBehavior.REJECT_WITH_SMS;
+    // The left button is only used to answer a video call as audio.
+    secondaryBehavior = SecondaryBehavior.ANSWER_VIDEO_AS_AUDIO;
     secondaryBehavior.applyToView(secondaryButton);
 
     secondaryButton.setOnClickListener(v -> performSecondaryButtonAction());
@@ -409,10 +364,10 @@ public class AnswerFragment extends Fragment
     secondaryButton.setFocusable(AccessibilityUtil.isAccessibilityEnabled(getContext()));
     secondaryButton.setAccessibilityDelegate(accessibilityDelegate);
 
-    if (isVideoUpgradeRequest()) {
-      secondaryButton.setVisibility(View.INVISIBLE);
-    } else if (isVideoCall()) {
+    if (isVideoCall() && !isVideoUpgradeRequest()) {
       secondaryButton.setVisibility(View.VISIBLE);
+    } else {
+      secondaryButton.setVisibility(View.INVISIBLE);
     }
 
     answerAndReleaseBehavior = SecondaryBehavior.ANSWER_AND_RELEASE;
@@ -448,24 +403,12 @@ public class AnswerFragment extends Fragment
 
   @Override
   public boolean hasPendingDialogs() {
-    boolean hasPendingDialogs =
-        textResponsesFragment != null || createCustomSmsDialogFragment != null;
-    LogUtil.i("AnswerFragment.hasPendingDialogs", "" + hasPendingDialogs);
-    return hasPendingDialogs;
+    return false;
   }
 
   @Override
   public void dismissPendingDialogs() {
     LogUtil.i("AnswerFragment.dismissPendingDialogs", null);
-    if (textResponsesFragment != null) {
-      textResponsesFragment.dismiss();
-      textResponsesFragment = null;
-    }
-
-    if (createCustomSmsDialogFragment != null) {
-      createCustomSmsDialogFragment.dismiss();
-      createCustomSmsDialogFragment = null;
-    }
   }
 
   @Override
@@ -948,108 +891,6 @@ public class AnswerFragment extends Fragment
         getAnswerMethod().setHintText(null);
       }
     }
-  }
-
-  private void showMessageMenu() {
-    LogUtil.i("AnswerFragment.showMessageMenu", "Show sms menu.");
-    if (getContext() == null || isDetached() || getChildFragmentManager().isDestroyed()) {
-      return;
-    }
-
-    textResponsesFragment = SmsBottomSheetFragment.newInstance(textResponses);
-    textResponsesFragment.show(getChildFragmentManager(), null);
-    secondaryButton
-        .animate()
-        .alpha(0)
-        .withEndAction(() -> {
-          affordanceHolderLayout.reset(false);
-          secondaryButton.animate().alpha(1);
-        });
-
-    TelecomUtil.silenceRinger(getContext());
-  }
-
-  @Override
-  public InCallUiLock acquireInCallUiLock(String tag) {
-    return answerScreenDelegate.acquireInCallUiLock(tag);
-  }
-
-  @Override
-  public void smsSelected(@Nullable CharSequence text) {
-    LogUtil.i("AnswerFragment.smsSelected", null);
-    textResponsesFragment = null;
-
-    if (text == null) {
-      if (!getContext().getSystemService(KeyguardManager.class).isKeyguardLocked()) {
-        LogUtil.i("AnswerFragment.smsSelected", "not locked, showing dialog directly");
-        showCustomSmsDialog();
-        return;
-      }
-
-      // Show the custom reply dialog only after device is unlocked, as it may cause impersonation
-      // see b/137134588
-      LogUtil.i("AnswerFragment.smsSelected", "dismissing keyguard");
-      getContext()
-          .getSystemService(KeyguardManager.class)
-          .requestDismissKeyguard(
-              getActivity(),
-              new KeyguardDismissCallback() {
-                @Override
-                public void onDismissCancelled() {
-                  LogUtil.i("AnswerFragment.smsSelected", "onDismissCancelled");
-                }
-
-                @Override
-                public void onDismissError() {
-                  LogUtil.i("AnswerFragment.smsSelected", "onDismissError");
-                }
-
-                @Override
-                public void onDismissSucceeded() {
-                  LogUtil.i("AnswerFragment.smsSelected", "onDismissSucceeded");
-                  showCustomSmsDialog();
-                }
-              });return;
-    }
-
-    if (primaryCallState != null && canRejectCallWithSms()) {
-      rejectCall();
-      answerScreenDelegate.onRejectCallWithMessage(text.toString());
-    }
-  }
-
-  private void showCustomSmsDialog() {
-    createCustomSmsDialogFragment = CreateCustomSmsDialogFragment.newInstance();
-    createCustomSmsDialogFragment.showNow(getChildFragmentManager(), null);
-  }
-
-  @Override
-  public void smsDismissed() {
-    LogUtil.i("AnswerFragment.smsDismissed", null);
-    textResponsesFragment = null;
-  }
-
-  @Override
-  public void customSmsCreated(@NonNull CharSequence text) {
-    LogUtil.i("AnswerFragment.customSmsCreated", null);
-    createCustomSmsDialogFragment = null;
-    if (primaryCallState != null && canRejectCallWithSms()) {
-      rejectCall();
-      answerScreenDelegate.onRejectCallWithMessage(text.toString());
-    }
-  }
-
-  @Override
-  public void customSmsDismissed() {
-    LogUtil.i("AnswerFragment.customSmsDismissed", null);
-    createCustomSmsDialogFragment = null;
-  }
-
-  private boolean canRejectCallWithSms() {
-    return primaryCallState != null
-        && !(primaryCallState.state() == DialerCallState.DISCONNECTED
-            || primaryCallState.state() == DialerCallState.DISCONNECTING
-            || primaryCallState.state() == DialerCallState.IDLE);
   }
 
   private void createInCallScreenDelegate() {

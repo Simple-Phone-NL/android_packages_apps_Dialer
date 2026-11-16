@@ -138,14 +138,6 @@ public class DialerSettingsActivity extends BaseActivity implements
       soundSettings.setIconSpaceReserved(false);
       getPreferenceScreen().addPreference(soundSettings);
 
-      Preference quickResponseSettings = new Preference(getContext());
-      Intent quickResponseSettingsIntent =
-              new Intent(TelecomManager.ACTION_SHOW_RESPOND_VIA_SMS_SETTINGS);
-      quickResponseSettings.setTitle(R.string.respond_via_sms_setting_title);
-      quickResponseSettings.setIntent(quickResponseSettingsIntent);
-      quickResponseSettings.setIconSpaceReserved(false);
-      getPreferenceScreen().addPreference(quickResponseSettings);
-
       final Preference lookupSettings = new Preference(getContext());
       lookupSettings.setTitle(R.string.lookup_settings_label);
       lookupSettings.setFragment(LookupSettingsFragment.class.getName());

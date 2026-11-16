@@ -30,9 +30,6 @@ public class AnswerScreenPresenterStub implements AnswerScreenDelegate {
   public void onAnswerScreenUnready() {}
 
   @Override
-  public void onRejectCallWithMessage(String message) {}
-
-  @Override
   public void onAnswer(boolean answerVideoAsAudio) {}
 
   @Override

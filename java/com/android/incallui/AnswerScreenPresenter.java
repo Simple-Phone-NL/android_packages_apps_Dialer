@@ -23,7 +23,6 @@ import android.telecom.VideoProfile;
 
 import androidx.annotation.FloatRange;
 import androidx.annotation.NonNull;
-import androidx.core.os.UserManagerCompat;
 
 import com.android.dialer.common.Assert;
 import com.android.dialer.common.LogUtil;
@@ -44,7 +43,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 
 /** Manages changes for an incoming call screen. */
 public class AnswerScreenPresenter
-    implements AnswerScreenDelegate, DialerCall.CannedTextResponsesLoadedListener {
+    implements AnswerScreenDelegate {
   private static final int ACCEPT_REJECT_CALL_TIME_OUT_IN_MILLIS = 5000;
 
   @NonNull
@@ -59,10 +58,6 @@ public class AnswerScreenPresenter
     this.context = Assert.isNotNull(context);
     this.answerScreen = Assert.isNotNull(answerScreen);
     this.call = Assert.isNotNull(call);
-    if (isSmsResponseAllowed(call)) {
-      answerScreen.setTextResponses(call.getCannedSmsResponses());
-    }
-    call.addCannedTextResponsesLoadedListener(this);
 
     PseudoScreenState pseudoScreenState = InCallPresenter.getInstance().getPseudoScreenState();
     if (AnswerProximitySensor.shouldUse(context, call)) {
@@ -85,15 +80,7 @@ public class AnswerScreenPresenter
   }
 
   @Override
-  public void onAnswerScreenUnready() {
-    call.removeCannedTextResponsesLoadedListener(this);
-  }
-
-  @Override
-  public void onRejectCallWithMessage(String message) {
-    call.reject(true /* rejectWithMessage */, message);
-    addTimeoutCheck();
-  }
+  public void onAnswerScreenUnready() {}
 
   @Override
   public void onAnswer(boolean answerVideoAsAudio) {
@@ -177,13 +164,6 @@ public class AnswerScreenPresenter
   }
 
   @Override
-  public void onCannedTextResponsesLoaded(DialerCall call) {
-    if (isSmsResponseAllowed(call)) {
-      answerScreen.setTextResponses(call.getCannedSmsResponses());
-    }
-  }
-
-  @Override
   public void updateWindowBackgroundColor(@FloatRange(from = -1f, to = 1.0f) float progress) {
     InCallActivity activity = (InCallActivity) answerScreen.getAnswerScreenFragment().getActivity();
     if (activity != null) {
@@ -230,11 +210,6 @@ public class AnswerScreenPresenter
 
     @Override
     public void onInternationalCallOnWifi() {}
-  }
-
-  private boolean isSmsResponseAllowed(DialerCall call) {
-    return UserManagerCompat.isUserUnlocked(context)
-        && call.can(android.telecom.Call.Details.CAPABILITY_RESPOND_VIA_TEXT);
   }
 
   private void addTimeoutCheck() {

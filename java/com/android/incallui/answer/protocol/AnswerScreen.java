@@ -19,8 +19,6 @@ package com.android.incallui.answer.protocol;
 
 import androidx.fragment.app.Fragment;
 
-import java.util.List;
-
 /** Interface for the answer module. */
 public interface AnswerScreen {
 
@@ -35,8 +33,6 @@ public interface AnswerScreen {
   boolean allowAnswerAndRelease();
 
   boolean isActionTimeout();
-
-  void setTextResponses(List<String> textResponses);
 
   boolean hasPendingDialogs();
 
